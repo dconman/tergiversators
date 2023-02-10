@@ -1,52 +1,49 @@
-
+use crate::Crew;
 use rand::Rng;
-use crate::Faction;
 
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Bag {
+#[derive(Clone, Copy, Default)]
+pub(crate) struct Bag {
     rogues: u8,
     goons: u8,
     bullies: u8,
 }
 
 impl Bag {
-    pub fn from_slice(slice: &[Faction]) -> Self {
+    pub(crate) fn from_slice(slice: &[Crew]) -> Self {
         let mut bag = Bag::default();
-        for faction in slice {
-            match faction {
-                Faction::Rogues => bag.rogues += 1,
-                Faction::Goons => bag.goons += 1,
-                Faction::Bullies => bag.bullies += 1,
+        for crew in slice {
+            match crew {
+                Crew::Rogues => bag.rogues += 1,
+                Crew::Goons => bag.goons += 1,
+                Crew::Bullies => bag.bullies += 1,
             }
         }
         bag
     }
-    pub fn draw(&mut self) -> Faction {
+    pub(crate) fn draw(&mut self) -> Crew {
         let total = self.rogues + self.goons + self.bullies;
         let mut rng = rand::thread_rng();
         let mut roll = rng.gen_range(0..total);
         if roll < self.rogues {
             self.rogues -= 1;
-            Faction::Rogues
+            Crew::Rogues
         } else {
             roll -= self.rogues;
             if roll < self.goons {
                 self.goons -= 1;
-                Faction::Goons
+                Crew::Goons
             } else {
                 self.bullies -= 1;
-                Faction::Bullies
+                Crew::Bullies
             }
         }
     }
 
-    pub fn replace(&mut self, faction: Faction) {
-        match faction {
-            Faction::Rogues => self.rogues += 1,
-            Faction::Goons => self.goons += 1,
-            Faction::Bullies => self.bullies += 1,
+    pub(crate) fn replace(&mut self, crew: Crew) {
+        match crew {
+            Crew::Rogues => self.rogues += 1,
+            Crew::Goons => self.goons += 1,
+            Crew::Bullies => self.bullies += 1,
         }
     }
 }
-
