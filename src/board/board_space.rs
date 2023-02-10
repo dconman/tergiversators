@@ -1,52 +1,52 @@
 use std::cmp::Ordering;
 
-use crate::{Error, Faction};
+use crate::{Crew, Error};
 
-#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct BoardSpace {
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+pub(super) struct BoardSpace {
     rogues: u8,
     bullies: u8,
     goons: u8,
 }
 
 impl BoardSpace {
-    pub fn home_base(faction: Faction) -> Self {
+    pub(super) fn home_base(crew: Crew) -> Self {
         let mut space = BoardSpace::default();
-        *space.get_faction_mut(faction) = 2;
+        *space.get_crew_mut(crew) = 2;
         space
     }
 
-    pub fn subtract_faction(&mut self, faction: Faction, amount: u8) -> Result<(), &'static str> {
-        let faction = self.get_faction_mut(faction);
-        match faction.checked_sub(amount) {
+    pub(super) fn subtract_crew(&mut self, crew: Crew, amount: u8) -> Result<(), &'static str> {
+        let crew = self.get_crew_mut(crew);
+        match crew.checked_sub(amount) {
             Some(diff) => {
-                *faction = diff;
+                *crew = diff;
                 Ok(())
             }
-            None => Err(Error::not_enough_stones_in_zone()),
+            None => Err(Error::NOT_ENOUGH_STONES_IN_ZONE),
         }
     }
 
-    pub fn add_faction(&mut self, faction: Faction, amount: u8) {
-        *self.get_faction_mut(faction) += amount;
+    pub(super) fn add_crew(&mut self, crew: Crew, amount: u8) {
+        *self.get_crew_mut(crew) += amount;
     }
 
-    pub fn check_faction(self, faction: Faction, amount: u8) -> Result<(), &'static str> {
-        if self.get_faction(faction) < amount {
-            return Err(Error::not_enough_stones_in_zone());
+    pub(super) fn check_crew(self, crew: Crew, amount: u8) -> Result<(), &'static str> {
+        if self.get_crew(crew) < amount {
+            return Err(Error::NOT_ENOUGH_STONES_IN_ZONE);
         }
         Ok(())
     }
 
-    pub fn winner(self, swords: Self, flags: Self) -> Option<Faction> {
-        let mut flag_sort : Vec<Faction> = enum_iterator::all::<Faction>().collect();
-        flag_sort.sort_unstable_by_key(|f| flags.get_faction(*f));
-        let mut sword_sort : Vec<Faction> = enum_iterator::all::<Faction>().collect();
-        sword_sort.sort_unstable_by_key(|f| swords.get_faction(*f));
+    pub(super) fn winner(self, swords: Self, flags: Self) -> Option<Crew> {
+        let mut flag_sort: Vec<Crew> = enum_iterator::all::<Crew>().collect();
+        flag_sort.sort_unstable_by_key(|f| flags.get_crew(*f));
+        let mut sword_sort: Vec<Crew> = enum_iterator::all::<Crew>().collect();
+        sword_sort.sort_unstable_by_key(|f| swords.get_crew(*f));
 
         if self.rogues == self.bullies && self.rogues == self.goons {
-            if swords.get_faction(sword_sort[0]) == swords.get_faction(sword_sort[1]) {
-                if flags.get_faction(flag_sort[0]) == flags.get_faction(flag_sort[1]) {
+            if swords.get_crew(sword_sort[0]) == swords.get_crew(sword_sort[1]) {
+                if flags.get_crew(flag_sort[0]) == flags.get_crew(flag_sort[1]) {
                     return None;
                 }
                 return Some(flag_sort[0]);
@@ -55,20 +55,19 @@ impl BoardSpace {
         }
 
         if self.rogues > self.bullies && self.rogues > self.goons {
-            return Some(Faction::Rogues);
+            return Some(Crew::Rogues);
         }
         if self.bullies > self.goons && self.bullies > self.rogues {
-            return Some(Faction::Bullies);
+            return Some(Crew::Bullies);
         }
         if self.goons > self.rogues && self.goons > self.bullies {
-            return Some(Faction::Goons);
+            return Some(Crew::Goons);
         }
 
-        let tie_breaker = |fac1, fac2| match swords.get_faction(fac1).cmp(&swords.get_faction(fac2))
-        {
+        let tie_breaker = |fac1, fac2| match swords.get_crew(fac1).cmp(&swords.get_crew(fac2)) {
             Ordering::Greater => Some(fac1),
             Ordering::Less => Some(fac2),
-            Ordering::Equal => match flags.get_faction(fac1).cmp(&flags.get_faction(fac2)) {
+            Ordering::Equal => match flags.get_crew(fac1).cmp(&flags.get_crew(fac2)) {
                 Ordering::Greater => Some(fac1),
                 Ordering::Less => Some(fac2),
                 Ordering::Equal => None,
@@ -76,21 +75,21 @@ impl BoardSpace {
         };
 
         if self.bullies == self.rogues {
-            return tie_breaker(Faction::Bullies, Faction::Rogues);
+            return tie_breaker(Crew::Bullies, Crew::Rogues);
         }
 
         if self.rogues == self.goons {
-            return tie_breaker(Faction::Goons, Faction::Rogues);
+            return tie_breaker(Crew::Goons, Crew::Rogues);
         }
 
         if self.goons == self.bullies {
-            return tie_breaker(Faction::Goons, Faction::Bullies);
+            return tie_breaker(Crew::Goons, Crew::Bullies);
         }
 
         None
     }
 
-    pub fn loser(self) -> Option<Faction> {
+    pub(super) fn loser(self) -> Option<Crew> {
         let inverse = BoardSpace {
             rogues: 255 - self.rogues,
             bullies: 255 - self.bullies,
@@ -99,37 +98,37 @@ impl BoardSpace {
         inverse.winner(BoardSpace::default(), BoardSpace::default())
     }
 
-    fn get_faction_mut(&mut self, faction: Faction) -> &mut u8 {
-        match faction {
-            Faction::Rogues => &mut self.rogues,
-            Faction::Bullies => &mut self.bullies,
-            Faction::Goons => &mut self.goons,
+    fn get_crew_mut(&mut self, crew: Crew) -> &mut u8 {
+        match crew {
+            Crew::Rogues => &mut self.rogues,
+            Crew::Bullies => &mut self.bullies,
+            Crew::Goons => &mut self.goons,
         }
     }
 
-    fn get_faction(self, faction: Faction) -> u8 {
-        match faction {
-            Faction::Rogues => self.rogues,
-            Faction::Bullies => self.bullies,
-            Faction::Goons => self.goons,
+    fn get_crew(self, crew: Crew) -> u8 {
+        match crew {
+            Crew::Rogues => self.rogues,
+            Crew::Bullies => self.bullies,
+            Crew::Goons => self.goons,
         }
     }
 
-    pub fn winning_sort(
+    pub(super) fn winning_sort(
         a: BoardSpace,
         b: BoardSpace,
-        winning_faction: Faction,
-        losing_faction: Option<Faction>,
+        winning_crew: Crew,
+        losing_crew: Option<Crew>,
     ) -> Ordering {
-        let tiebreaker = if let Some(losing_faction) = losing_faction {
-            a.get_faction(losing_faction)
-                .cmp(&b.get_faction(losing_faction))
+        let tiebreaker = if let Some(losing_crew) = losing_crew {
+            a.get_crew(losing_crew)
+                .cmp(&b.get_crew(losing_crew))
                 .reverse()
         } else {
             Ordering::Equal
         };
-        a.get_faction(winning_faction)
-            .cmp(&b.get_faction(winning_faction))
+        a.get_crew(winning_crew)
+            .cmp(&b.get_crew(winning_crew))
             .then(tiebreaker)
     }
 }

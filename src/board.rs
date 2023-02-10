@@ -1,35 +1,7 @@
-//          _____
-//         /     \
-//        /       \_____
-//        \             \
-//         \   Green     \
-//         /   Goons     /
-//   _____/        _____/        _____         _____
-//  /     \       /     \       /     \       /     \
-// /       \_____/       \_____/       \_____/       \_____
-// \             \             \             \             \
-//  \   Yellow    \    Cyan     \   Magenta   \   Blue      \
-//  /             /             /             /   Bullies   /
-// /        _____/        _____/        _____/        _____/
-// \       /     \       /     \       /     \       /     \
-//  \_____/       \_____/ XXXXX \_____/       \_____/       \_____
-//        \             \ XXXXXX      \             \             \
-//         \   Orange    \ XXXXXXXXXXX \   Purple    \   White     \
-//         /             / XXXXXXXXXXX /             /             /
-//        /        _____/ XXXXXX _____/        _____/        _____/
-//        \       /     \ XXXXX /     \       /     \       /
-//         \_____/       \_____/       \_____/       \_____/
-//               \             \             \             \
-//                \    Red      \    Grey     \   Black     \
-//                /   Rogues    /             /             /
-//               /        _____/        _____/        _____/
-//               \       /     \       /     \       /
-//                \_____/       \_____/       \_____/
-
 use crate::bag::Bag;
 use crate::board::board_space::BoardSpace;
 use crate::Error;
-use crate::{Action, Faction, Player, Zone};
+use crate::{Action, Crew, Player, TurnResult, Winner, Zone};
 use rand::seq::SliceRandom;
 
 mod board_space;
@@ -51,16 +23,16 @@ const ADJACENCIES: [(Zone, Zone); 34] = [
 
 // 57 start in the bag, 6 start on the board
 #[rustfmt::skip]
-const DEFAULT_BAG: [Faction; 57] = [
-    Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies, Faction::Bullies,
-    Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons, Faction::Goons,
-    Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues, Faction::Rogues,
+const DEFAULT_BAG: [Crew; 57] = [
+    Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies,
+    Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons,
+    Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues,
 ];
 
 const ZONES_TO_FILL: usize = 8;
 
 #[derive(Default, Clone, Copy)]
-pub struct Board {
+pub(crate) struct Board {
     bag: Bag,
 
     red: BoardSpace,
@@ -86,19 +58,19 @@ pub struct Board {
 
     num_players: u8,
     next_player: Player,
-    negotiation: Option<Player>,
+    current_negotiation: bool,
     consecutive_negotiations: u8,
 }
 
 impl Board {
-    pub fn build(num_players: u8) -> Result<Self, &'static str> {
+    pub(crate) fn build(num_players: u8) -> Result<Self, &'static str> {
         if !(2..=5).contains(&num_players) {
-            return Err(Error::bad_player_count());
+            return Err(Error::BAD_PLAYER_COUNT);
         }
         let mut board = Board {
-            red: BoardSpace::home_base(Faction::Rogues),
-            green: BoardSpace::home_base(Faction::Goons),
-            blue: BoardSpace::home_base(Faction::Bullies),
+            red: BoardSpace::home_base(Crew::Rogues),
+            green: BoardSpace::home_base(Crew::Goons),
+            blue: BoardSpace::home_base(Crew::Bullies),
             num_players,
             ..Board::default()
         };
@@ -159,33 +131,33 @@ impl Board {
     }
 
     fn setup(&mut self, num_players: usize) {
-        let mut peices = [Faction::Rogues; 57];
+        let mut peices = [Crew::Rogues; 57];
         peices.copy_from_slice(&DEFAULT_BAG);
         peices.shuffle(&mut rand::thread_rng());
 
-        for (zone, factions) in enum_iterator::all::<Zone>()
+        for (zone, crews) in enum_iterator::all::<Zone>()
             .skip(3)
             .zip(peices.chunks_exact(2))
         {
-            self.get_space_mut(zone).add_faction(factions[0], 1);
-            self.get_space_mut(zone).add_faction(factions[1], 1);
+            self.get_space_mut(zone).add_crew(crews[0], 1);
+            self.get_space_mut(zone).add_crew(crews[1], 1);
         }
 
-        for (player, factions) in enum_iterator::all::<Player>()
+        for (player, crews) in enum_iterator::all::<Player>()
             .take(num_players)
             .zip(peices[ZONES_TO_FILL * 2..].chunks_exact(8))
         {
             let hand = self.get_hand_mut(player);
-            for &f in factions {
-                hand.add_faction(f, 1);
+            for &f in crews {
+                hand.add_crew(f, 1);
             }
         }
 
         self.bag = Bag::from_slice(&peices[(ZONES_TO_FILL * 2 + num_players * 8)..]);
     }
 
-    fn play_faction(&mut self, player: Player, faction: Faction) -> Result<(), &'static str> {
-        self.get_hand_mut(player).subtract_faction(faction, 1)
+    fn play_crew(&mut self, player: Player, crew: Crew) -> Result<(), &'static str> {
+        self.get_hand_mut(player).subtract_crew(crew, 1)
     }
 
     fn advance_turn(&mut self) {
@@ -213,31 +185,34 @@ impl Board {
     fn battle(
         &mut self,
         player: Player,
+        crew: Crew,
         zone: Zone,
         rogues: u8,
         bullies: u8,
         goons: u8,
     ) -> Result<(), &'static str> {
-        let (removal, attacking_faction) = match (rogues, goons, bullies) {
-            (0, 0, 0) => return Err(Error::must_remove_when_attacking()),
-            (0, x, y) => (x + y, Faction::Rogues),
-            (x, 0, y) => (x + y, Faction::Bullies),
-            (x, y, 0) => (x + y, Faction::Goons),
-            _ => return Err(Error::cannot_remove_from_attacking_faction()),
-        };
-
-        self.play_faction(player, attacking_faction)?;
-
-        self.get_space(zone)
-            .check_faction(attacking_faction, removal)?;
-
-        self.swords.add_faction(attacking_faction, 1);
-
-        for (faction, &amount) in
-            enum_iterator::all::<Faction>().zip([rogues, bullies, goons].iter())
+        if match crew {
+            Crew::Rogues => rogues,
+            Crew::Bullies => bullies,
+            Crew::Goons => goons,
+        } > 0
         {
-            self.get_space_mut(zone).subtract_faction(faction, amount)?;
-            self.bag.replace(faction);
+            return Err(Error::CANNOT_REMOVE_FROM_ATTACKING_FACTION);
+        };
+        let removal = rogues + bullies + goons;
+        if removal == 0 {
+            return Err(Error::MUST_REMOVE_WHEN_ATTACKING);
+        }
+
+        self.play_crew(player, crew)?;
+
+        self.get_space(zone).check_crew(crew, removal)?;
+
+        self.swords.add_crew(crew, 1);
+
+        for (crew, &amount) in enum_iterator::all::<Crew>().zip([rogues, bullies, goons].iter()) {
+            self.get_space_mut(zone).subtract_crew(crew, amount)?;
+            self.bag.replace(crew);
         }
 
         Ok(())
@@ -246,46 +221,41 @@ impl Board {
     fn march(
         &mut self,
         player: Player,
-        faction: Faction,
+        crew: Crew,
         from: Zone,
         to: Zone,
         amount: u8,
     ) -> Result<(), &'static str> {
         if !ADJACENCIES.contains(&(from, to)) {
-            return Err(Error::cannot_march_from_to());
+            return Err(Error::CANNOT_MARCH_FROM_TO);
         }
-        self.play_faction(player, faction)?;
-        self.get_space_mut(from).subtract_faction(faction, amount)?;
-        self.flags.add_faction(faction, 1);
-        self.get_space_mut(to).add_faction(faction, amount);
+        self.play_crew(player, crew)?;
+        self.get_space_mut(from).subtract_crew(crew, amount)?;
+        self.flags.add_crew(crew, 1);
+        self.get_space_mut(to).add_crew(crew, amount);
         Ok(())
     }
 
     // This will never return an error, but the signature should match the other methods
     #[allow(clippy::unnecessary_wraps)]
     fn start_negotiation(&mut self, player: Player) -> Result<(), &'static str> {
-        let faction = self.bag.draw();
-        self.get_hand_mut(player).add_faction(faction, 1);
-        self.negotiation = Some(player);
+        let crew = self.bag.draw();
+        self.get_hand_mut(player).add_crew(crew, 1);
+        self.current_negotiation = true;
         Ok(())
     }
 
-    fn end_negotiation(&mut self, player: Player, faction: Faction) -> Result<(), &'static str> {
-        self.play_faction(player, faction)?;
-        self.bag.replace(faction);
-        self.negotiation = None;
+    fn end_negotiation(&mut self, player: Player, crew: Crew) -> Result<(), &'static str> {
+        self.play_crew(player, crew)?;
+        self.bag.replace(crew);
+        self.current_negotiation = false;
         self.consecutive_negotiations += 1;
         Ok(())
     }
 
-    fn recruit(
-        &mut self,
-        player: Player,
-        faction: Faction,
-        zone: Zone,
-    ) -> Result<(), &'static str> {
-        self.play_faction(player, faction)?;
-        self.get_space_mut(zone).add_faction(faction, 1);
+    fn recruit(&mut self, player: Player, crew: Crew, zone: Zone) -> Result<(), &'static str> {
+        self.play_crew(player, crew)?;
+        self.get_space_mut(zone).add_crew(crew, 1);
         Ok(())
     }
 
@@ -294,13 +264,13 @@ impl Board {
         let num_players = self.num_players.into();
 
         for zone in enum_iterator::all::<Zone>() {
-            if let Some(faction) = self.get_space(zone).winner(self.swords, self.flags) {
-                scores.add_faction(faction, 1);
+            if let Some(crew) = self.get_space(zone).winner(self.swords, self.flags) {
+                scores.add_crew(crew, 1);
             }
         }
 
-        let winning_faction = scores.winner(self.swords, self.flags)?;
-        let losing_faction = scores.loser();
+        let winning_crew = scores.winner(self.swords, self.flags)?;
+        let losing_crew = scores.loser();
 
         let play_order: Vec<Player> = enum_iterator::all::<Player>()
             .take(num_players)
@@ -313,66 +283,53 @@ impl Board {
         players.sort_unstable_by(|&a, &b| {
             let a_hand = self.get_hand(a);
             let b_hand = self.get_hand(b);
-            BoardSpace::winning_sort(*a_hand, *b_hand, winning_faction, losing_faction).then_with(
-                || {
-                    play_order
-                        .iter()
-                        .position(|&p| p == a)
-                        .cmp(&play_order.iter().position(|&p| p == b))
-                },
-            )
+            BoardSpace::winning_sort(*a_hand, *b_hand, winning_crew, losing_crew).then_with(|| {
+                play_order
+                    .iter()
+                    .position(|&p| p == a)
+                    .cmp(&play_order.iter().position(|&p| p == b))
+            })
         });
 
         Some(players[0])
     }
 
-    pub fn process_action(self, action: Action) -> (Board, Result<Option<Option<Player>>, Error>) {
-        if self.negotiation.is_some() && !matches!(action, Action::EndNegotiation(_, _)) {
-            return (
+    pub(crate) fn process_action(self, action: Action) -> TurnResult {
+        if self.current_negotiation && !matches!(action, Action::EndNegotiation(_)) {
+            return TurnResult::new(
                 self,
                 Err(Error {
-                    reason: Error::negotiation_in_progress(),
-                    action,
-                }),
-            );
-        }
-
-        if action.player() != self.next_player {
-            return (
-                self,
-                Err(Error {
-                    reason: Error::not_your_turn(),
+                    reason: Error::NEGOTIATION_IN_PROGRESS,
                     action,
                 }),
             );
         }
 
         let mut next = self;
+        let player = self.next_player;
 
-        if !matches!(action, Action::StartNegotiation(_)) {
+        if !matches!(action, Action::StartNegotiation) {
             next.advance_turn();
         }
 
         let res = match action {
-            Action::EndNegotiation(player, faction) => next.end_negotiation(player, faction),
-            Action::Battle(player, zone, red, blue, green) => {
-                next.battle(player, zone, red, blue, green)
+            Action::EndNegotiation(crew) => next.end_negotiation(player, crew),
+            Action::Battle(crew, zone, red, blue, green) => {
+                next.battle(player, crew, zone, red, blue, green)
             }
-            Action::March(player, faction, from, to, amount) => {
-                next.march(player, faction, from, to, amount)
-            }
-            Action::StartNegotiation(player) => next.start_negotiation(player),
-            Action::Recruit(player, faction, zone) => next.recruit(player, faction, zone),
+            Action::March(crew, from, to, amount) => next.march(player, crew, from, to, amount),
+            Action::StartNegotiation => next.start_negotiation(player),
+            Action::Recruit(crew, zone) => next.recruit(player, crew, zone),
         }
         .map_err(|reason| Error { action, reason })
         .map(|_| {
             if next.consecutive_negotiations >= next.num_players {
-                Some(next.score())
+                Some(next.score().map_or(Winner::Draw, Winner::Player))
             } else {
                 None
             }
         });
 
-        (next, res)
+        TurnResult::new(next, res)
     }
 }
