@@ -1,3 +1,0 @@
-(function() {var implementors = {
-"tergiversators":[["impl Sequence for <a class=\"enum\" href=\"tergiversators/enum.Zone.html\" title=\"enum tergiversators::Zone\">Zone</a>"],["impl Sequence for <a class=\"enum\" href=\"tergiversators/enum.Crew.html\" title=\"enum tergiversators::Crew\">Crew</a>"],["impl Sequence for <a class=\"enum\" href=\"tergiversators/enum.Player.html\" title=\"enum tergiversators::Player\">Player</a>"]]
-};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
