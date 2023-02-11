@@ -1,56 +1,13 @@
 //! An implementation of the game [Turncoats](https://mildamatildagames.wordpress.com/turncoats-2/)
 //! [bgg](https://boardgamegeek.com/boardgame/352238/turncoats).
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
+#![warn(absolute_paths_not_starting_with_crate,box_pointers,elided_lifetimes_in_paths,explicit_outlives_requirements,keyword_idents,let_underscore_drop,macro_use_extern_crate,meta_variable_misuse,missing_abi,missing_copy_implementations,missing_docs,non_ascii_idents,noop_method_call,pointer_structural_match,rust_2021_incompatible_closure_captures,rust_2021_incompatible_or_patterns,rust_2021_prefixes_incompatible_syntax,rust_2021_prelude_collisions,single_use_lifetimes,trivial_casts,trivial_numeric_casts,unreachable_pub,unsafe_code,unsafe_op_in_unsafe_fn,unstable_features,unused_crate_dependencies,unused_extern_crates,unused_import_braces,unused_lifetimes,unused_macro_rules,unused_qualifications,unused_results,unused_tuple_struct_fields,variant_size_differences)]
 
-#![warn(
-    clippy::pedantic,
-    absolute_paths_not_starting_with_crate,
-    box_pointers,
-    elided_lifetimes_in_paths,
-    explicit_outlives_requirements,
-    keyword_idents,
-    let_underscore_drop,
-    macro_use_extern_crate,
-    meta_variable_misuse,
-    missing_abi,
-    missing_copy_implementations,
-    missing_docs,
-    non_ascii_idents,
-    noop_method_call,
-    pointer_structural_match,
-    rust_2021_incompatible_closure_captures,
-    rust_2021_incompatible_or_patterns,
-    rust_2021_prefixes_incompatible_syntax,
-    rust_2021_prelude_collisions,
-    single_use_lifetimes,
-    trivial_casts,
-    trivial_numeric_casts,
-    unreachable_pub,
-    unsafe_code,
-    unsafe_op_in_unsafe_fn,
-    unstable_features,
-    unused_crate_dependencies,
-    unused_extern_crates,
-    unused_import_braces,
-    unused_lifetimes,
-    unused_macro_rules,
-    unused_qualifications,
-    unused_results,
-    unused_tuple_struct_fields,
-    variant_size_differences
-)]
-
+#[doc(inline)]
+pub use board::Board;
 use enum_iterator::Sequence;
 
-mod bag;
 mod board;
-
-/// A game of Turncoats.
-// TODO: add public interface
-#[derive(Clone, Copy)]
-pub struct Board {
-    board: board::Board,
-}
-
 /// An error that can occur when performing an action.
 #[derive(Clone, Copy)]
 pub struct Error {
@@ -171,16 +128,11 @@ pub enum Crew {
 #[derive(Clone, Copy)]
 pub struct TurnResult(pub Board, pub Result<Option<Winner>, Error>);
 
-impl TurnResult {
-    fn new(board: board::Board, result: Result<Option<Winner>, Error>) -> Self {
-        Self(Board { board }, result)
-    }
-}
-
 /// The players in the game.
 /// Unused players are skipped over.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Eq, Sequence, Default)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub enum Player {
     #[default]
     Alpha,
@@ -212,7 +164,7 @@ pub enum Winner {
 /// # Errors
 /// Returns `Err(&'static str)` if the number of players is not between 2 and 5.
 pub fn start_game(num_players: u8) -> Result<Board, &'static str> {
-    board::Board::build(num_players).map(|board| Board { board })
+    board::Board::build(num_players)
 }
 
 /// Takes the next turn
@@ -228,5 +180,5 @@ pub fn start_game(num_players: u8) -> Result<Board, &'static str> {
 ///
 #[must_use]
 pub fn take_turn(board: Board, action: Action) -> TurnResult {
-    board.board.process_action(action)
+    board.process_action(action)
 }

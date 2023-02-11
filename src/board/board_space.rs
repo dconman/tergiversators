@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use crate::{Crew, Error};
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub(super) struct BoardSpace {
     rogues: u8,
     bullies: u8,
@@ -10,28 +11,43 @@ pub(super) struct BoardSpace {
 }
 
 impl BoardSpace {
-    pub(super) fn home_base(crew: Crew) -> Self {
-        let mut space = BoardSpace::default();
-        *space.get_crew_mut(crew) = 2;
-        space
+    pub(super) const EMPTY: Self = Self{
+        rogues: 0,
+        bullies: 0,
+        goons: 0,
+    };
+
+    pub(super) const fn home_base(crew: Crew) -> Self {
+        match crew {
+            Crew::Rogues => Self {
+                rogues: 2,
+                ..Self::EMPTY
+            },
+            Crew::Bullies => Self {
+                bullies: 2,
+                ..Self::EMPTY
+            },
+            Crew::Goons => Self {
+                goons: 2,
+                ..Self::EMPTY
+            },
+        }
     }
 
     pub(super) fn subtract_crew(&mut self, crew: Crew, amount: u8) -> Result<(), &'static str> {
         let crew = self.get_crew_mut(crew);
-        match crew.checked_sub(amount) {
-            Some(diff) => {
+        crew.checked_sub(amount)
+            .map_or(Err(Error::NOT_ENOUGH_STONES_IN_ZONE), |diff| {
                 *crew = diff;
                 Ok(())
-            }
-            None => Err(Error::NOT_ENOUGH_STONES_IN_ZONE),
-        }
+            })
     }
 
     pub(super) fn add_crew(&mut self, crew: Crew, amount: u8) {
         *self.get_crew_mut(crew) += amount;
     }
 
-    pub(super) fn check_crew(self, crew: Crew, amount: u8) -> Result<(), &'static str> {
+    pub(super) const fn check_crew(self, crew: Crew, amount: u8) -> Result<(), &'static str> {
         if self.get_crew(crew) < amount {
             return Err(Error::NOT_ENOUGH_STONES_IN_ZONE);
         }
@@ -90,12 +106,12 @@ impl BoardSpace {
     }
 
     pub(super) fn loser(self) -> Option<Crew> {
-        let inverse = BoardSpace {
+        let inverse = Self {
             rogues: 255 - self.rogues,
             bullies: 255 - self.bullies,
             goons: 255 - self.goons,
         };
-        inverse.winner(BoardSpace::default(), BoardSpace::default())
+        inverse.winner(Self::default(), Self::default())
     }
 
     fn get_crew_mut(&mut self, crew: Crew) -> &mut u8 {
@@ -106,7 +122,7 @@ impl BoardSpace {
         }
     }
 
-    fn get_crew(self, crew: Crew) -> u8 {
+    const fn get_crew(self, crew: Crew) -> u8 {
         match crew {
             Crew::Rogues => self.rogues,
             Crew::Bullies => self.bullies,
@@ -115,18 +131,16 @@ impl BoardSpace {
     }
 
     pub(super) fn winning_sort(
-        a: BoardSpace,
-        b: BoardSpace,
+        a: Self,
+        b: Self,
         winning_crew: Crew,
         losing_crew: Option<Crew>,
     ) -> Ordering {
-        let tiebreaker = if let Some(losing_crew) = losing_crew {
-            a.get_crew(losing_crew)
+        let tiebreaker = losing_crew
+            .map_or(Ordering::Equal, |losing_crew| a.get_crew(losing_crew)
                 .cmp(&b.get_crew(losing_crew))
                 .reverse()
-        } else {
-            Ordering::Equal
-        };
+            );
         a.get_crew(winning_crew)
             .cmp(&b.get_crew(winning_crew))
             .then(tiebreaker)

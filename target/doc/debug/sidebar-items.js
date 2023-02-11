@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["battle",""],["end_negotiation",""],["get_action",""],["get_crew",""],["get_number",""],["get_winner",""],["get_zone",""],["main",""],["march",""],["recruit",""],["translate_action",""],["translate_crew",""],["translate_zone",""]]};

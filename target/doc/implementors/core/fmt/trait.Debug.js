@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"tergiversators":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.67.1/core/fmt/trait.Debug.html\" title=\"trait core::fmt::Debug\">Debug</a> for <a class=\"struct\" href=\"tergiversators/struct.Board.html\" title=\"struct tergiversators::Board\">Board</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.67.1/core/fmt/trait.Debug.html\" title=\"trait core::fmt::Debug\">Debug</a> for <a class=\"enum\" href=\"tergiversators/enum.Player.html\" title=\"enum tergiversators::Player\">Player</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

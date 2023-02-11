@@ -1,16 +1,23 @@
 use crate::Crew;
 use rand::Rng;
 
+#[cfg_attr(debug_assertions, derive(Debug))]
 #[derive(Clone, Copy, Default)]
-pub(crate) struct Bag {
+pub(super) struct Bag {
     rogues: u8,
     goons: u8,
     bullies: u8,
 }
 
 impl Bag {
+    pub(super) const EMPTY: Self = Self {
+        rogues: 0,
+        goons: 0,
+        bullies: 0,
+    };
+
     pub(crate) fn from_slice(slice: &[Crew]) -> Self {
-        let mut bag = Bag::default();
+        let mut bag = Self::default();
         for crew in slice {
             match crew {
                 Crew::Rogues => bag.rogues += 1,

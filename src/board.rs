@@ -1,46 +1,28 @@
-use crate::bag::Bag;
-use crate::board::board_space::BoardSpace;
 use crate::Error;
 use crate::{Action, Crew, Player, TurnResult, Winner, Zone};
+use bag::Bag;
+use board_space::BoardSpace;
 use rand::seq::SliceRandom;
 
+mod bag;
 mod board_space;
+mod constants;
 
-#[rustfmt::skip]
-const ADJACENCIES: [(Zone, Zone); 34] = [
-    (Zone::Green  , Zone::Cyan   ), (Zone::Green  , Zone::Yellow ),
-    (Zone::Red    , Zone::Gray   ), (Zone::Red    , Zone::Orange ),
-    (Zone::Black  , Zone::Gray   ), (Zone::Black  , Zone::Purple ), (Zone::Black  , Zone::White  ),
-    (Zone::Blue   , Zone::Magenta), (Zone::Blue   , Zone::Purple ), (Zone::Blue   , Zone::White  ),
-    (Zone::Gray   , Zone::Black  ), (Zone::Gray   , Zone::Purple ), (Zone::Gray   , Zone::Red    ),
-    (Zone::Magenta, Zone::Blue   ), (Zone::Magenta, Zone::Cyan   ), (Zone::Magenta, Zone::Purple ),
-    (Zone::Orange , Zone::Cyan   ), (Zone::Orange , Zone::Red    ), (Zone::Orange , Zone::Yellow ),
-    (Zone::White  , Zone::Black  ), (Zone::White  , Zone::Blue   ), (Zone::White  , Zone::Purple ),
-    (Zone::Yellow , Zone::Cyan   ), (Zone::Yellow , Zone::Green  ), (Zone::Yellow , Zone::Orange ),
-    (Zone::Cyan   , Zone::Green  ), (Zone::Cyan   , Zone::Magenta), (Zone::Cyan   , Zone::Orange ), (Zone::Cyan   , Zone::Yellow ),
-    (Zone::Purple , Zone::Black  ), (Zone::Purple , Zone::Blue   ), (Zone::Purple , Zone::Gray   ), (Zone::Purple , Zone::Magenta), (Zone::Purple , Zone::White  ),
-];
+#[allow(clippy::wildcard_imports)]
+use constants::*;
 
-// 57 start in the bag, 6 start on the board
-#[rustfmt::skip]
-const DEFAULT_BAG: [Crew; 57] = [
-    Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies, Crew::Bullies,
-    Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons, Crew::Goons,
-    Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues, Crew::Rogues,
-];
-
-const ZONES_TO_FILL: usize = 8;
-
-#[derive(Default, Clone, Copy)]
-pub(crate) struct Board {
+/// The board is the game state. It tracks everything about the game.
+#[derive(Clone, Copy)]
+#[cfg_attr(debug_assertions, derive(Debug))]
+pub struct Board {
     bag: Bag,
 
     red: BoardSpace,
+    green: BoardSpace,
+    blue: BoardSpace,
     orange: BoardSpace,
     yellow: BoardSpace,
-    green: BoardSpace,
     cyan: BoardSpace,
-    blue: BoardSpace,
     magenta: BoardSpace,
     purple: BoardSpace,
     white: BoardSpace,
@@ -63,16 +45,39 @@ pub(crate) struct Board {
 }
 
 impl Board {
+    const EMPTY: Self = Self{
+        red: BoardSpace::home_base(Crew::Rogues),
+        green: BoardSpace::home_base(Crew::Goons),
+        blue: BoardSpace::home_base(Crew::Bullies),
+        orange: BoardSpace::EMPTY,
+        yellow: BoardSpace::EMPTY,
+        cyan: BoardSpace::EMPTY,
+        magenta: BoardSpace::EMPTY,
+        purple: BoardSpace::EMPTY,
+        white: BoardSpace::EMPTY,
+        black: BoardSpace::EMPTY,
+        gray: BoardSpace::EMPTY,
+        alpha: BoardSpace::EMPTY,
+        beta: BoardSpace::EMPTY,
+        gamma: BoardSpace::EMPTY,
+        delta: BoardSpace::EMPTY,
+        epsilon: BoardSpace::EMPTY,
+        swords: BoardSpace::EMPTY,
+        flags: BoardSpace::EMPTY,
+        bag: Bag::EMPTY,
+        next_player: Player::Alpha,
+        current_negotiation: false,
+        consecutive_negotiations: 0,
+        num_players: 2,
+    };
+
     pub(crate) fn build(num_players: u8) -> Result<Self, &'static str> {
         if !(2..=5).contains(&num_players) {
             return Err(Error::BAD_PLAYER_COUNT);
         }
-        let mut board = Board {
-            red: BoardSpace::home_base(Crew::Rogues),
-            green: BoardSpace::home_base(Crew::Goons),
-            blue: BoardSpace::home_base(Crew::Bullies),
+        let mut board = Self {
             num_players,
-            ..Board::default()
+            ..Self::EMPTY
         };
         board.setup(num_players.into());
         Ok(board)
@@ -94,7 +99,7 @@ impl Board {
         }
     }
 
-    fn get_space(&self, zone: Zone) -> &BoardSpace {
+    const fn get_space(&self, zone: Zone) -> &BoardSpace {
         match zone {
             Zone::Red => &self.red,
             Zone::Orange => &self.orange,
@@ -120,7 +125,7 @@ impl Board {
         }
     }
 
-    fn get_hand(&self, player: Player) -> &BoardSpace {
+    const fn get_hand(&self, player: Player) -> &BoardSpace {
         match player {
             Player::Alpha => &self.alpha,
             Player::Beta => &self.beta,
@@ -296,7 +301,7 @@ impl Board {
 
     pub(crate) fn process_action(self, action: Action) -> TurnResult {
         if self.current_negotiation && !matches!(action, Action::EndNegotiation(_)) {
-            return TurnResult::new(
+            return TurnResult(
                 self,
                 Err(Error {
                     reason: Error::NEGOTIATION_IN_PROGRESS,
@@ -330,6 +335,6 @@ impl Board {
             }
         });
 
-        TurnResult::new(next, res)
+        TurnResult(next, res)
     }
 }
