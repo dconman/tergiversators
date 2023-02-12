@@ -1,8 +1,8 @@
 use crate::Crew;
 use rand::Rng;
 
-#[cfg_attr(debug_assertions, derive(Debug))]
 #[derive(Clone, Copy, Default)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub(super) struct Bag {
     rogues: u8,
     goons: u8,

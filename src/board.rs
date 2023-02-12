@@ -269,12 +269,12 @@ impl Board {
         let num_players = self.num_players.into();
 
         for zone in enum_iterator::all::<Zone>() {
-            if let Some(crew) = self.get_space(zone).winner(self.swords, self.flags) {
+            if let Some(crew) = self.get_space(zone).controller(self.swords, self.flags) {
                 scores.add_crew(crew, 1);
             }
         }
 
-        let winning_crew = scores.winner(self.swords, self.flags)?;
+        let winning_crew = scores.controller(self.swords, self.flags)?;
         let losing_crew = scores.loser();
 
         let play_order: Vec<Player> = enum_iterator::all::<Player>()
