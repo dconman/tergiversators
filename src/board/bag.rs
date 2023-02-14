@@ -16,7 +16,7 @@ impl Bag {
         bullies: 0,
     };
 
-    pub(crate) fn from_slice(slice: &[Crew]) -> Self {
+    pub(super) fn from_slice(slice: &[Crew]) -> Self {
         let mut bag = Self::default();
         for crew in slice {
             match crew {
@@ -27,7 +27,8 @@ impl Bag {
         }
         bag
     }
-    pub(crate) fn draw(&mut self) -> Crew {
+
+    pub(super) fn draw(&mut self) -> Crew {
         let total = self.rogues + self.goons + self.bullies;
         let mut rng = rand::thread_rng();
         let mut roll = rng.gen_range(0..total);
@@ -46,7 +47,7 @@ impl Bag {
         }
     }
 
-    pub(crate) fn replace(&mut self, crew: Crew) {
+    pub(super) fn replace(&mut self, crew: Crew) {
         match crew {
             Crew::Rogues => self.rogues += 1,
             Crew::Goons => self.goons += 1,

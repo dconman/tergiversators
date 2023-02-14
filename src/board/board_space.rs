@@ -65,13 +65,11 @@ impl BoardSpace {
         Ok(())
     }
 
-    pub(super) fn controller(self, swords: Self, flags: Self) -> Option<Crew> {
-        let mut flag_sort: Vec<Crew> = enum_iterator::all::<Crew>().collect();
-        flag_sort.sort_unstable_by_key(|f| flags.get_crew(*f));
-        let mut sword_sort: Vec<Crew> = enum_iterator::all::<Crew>().collect();
-        sword_sort.sort_unstable_by_key(|f| swords.get_crew(*f));
+    pub(super) fn controlling_crew(self, swords: Self, flags: Self) -> Option<Crew> {
+        let flag_sort = flags.get_sorted_crews();
+        let sword_sort = swords.get_sorted_crews();
 
-        if self.rogues == self.bullies && self.rogues == self.goons {
+        if self.rogues == self.goons && self.rogues == self.bullies {
             if swords.get_crew(sword_sort[0]) == swords.get_crew(sword_sort[1]) {
                 if flags.get_crew(flag_sort[0]) == flags.get_crew(flag_sort[1]) {
                     return None;
@@ -81,39 +79,27 @@ impl BoardSpace {
             return Some(sword_sort[0]);
         }
 
-        if self.rogues > self.bullies && self.rogues > self.goons {
-            return Some(Crew::Rogues);
-        }
-        if self.bullies > self.goons && self.bullies > self.rogues {
-            return Some(Crew::Bullies);
-        }
-        if self.goons > self.rogues && self.goons > self.bullies {
-            return Some(Crew::Goons);
+        let self_sort = self.get_sorted_crews();
+
+        if self.get_crew(self_sort[0]) != self.get_crew(self_sort[1]) {
+            return Some(self_sort[0]);
         }
 
-        let tie_breaker = |fac1, fac2| match swords.get_crew(fac1).cmp(&swords.get_crew(fac2)) {
-            Ordering::Greater => Some(fac1),
-            Ordering::Less => Some(fac2),
-            Ordering::Equal => match flags.get_crew(fac1).cmp(&flags.get_crew(fac2)) {
-                Ordering::Greater => Some(fac1),
-                Ordering::Less => Some(fac2),
+        match swords
+            .get_crew(self_sort[0])
+            .cmp(&swords.get_crew(self_sort[1]))
+        {
+            Ordering::Greater => Some(self_sort[0]),
+            Ordering::Less => Some(self_sort[1]),
+            Ordering::Equal => match flags
+                .get_crew(self_sort[0])
+                .cmp(&flags.get_crew(self_sort[1]))
+            {
+                Ordering::Greater => Some(self_sort[0]),
+                Ordering::Less => Some(self_sort[1]),
                 Ordering::Equal => None,
             },
-        };
-
-        if self.bullies == self.rogues {
-            return tie_breaker(Crew::Bullies, Crew::Rogues);
         }
-
-        if self.rogues == self.goons {
-            return tie_breaker(Crew::Goons, Crew::Rogues);
-        }
-
-        if self.goons == self.bullies {
-            return tie_breaker(Crew::Goons, Crew::Bullies);
-        }
-
-        None
     }
 
     pub(super) fn loser(self) -> Option<Crew> {
@@ -122,7 +108,7 @@ impl BoardSpace {
             bullies: 255 - self.bullies,
             goons: 255 - self.goons,
         };
-        inverse.controller(Self::default(), Self::default())
+        inverse.controlling_crew(Self::default(), Self::default())
     }
 
     fn get_crew_mut(&mut self, crew: Crew) -> &mut u8 {
@@ -131,6 +117,13 @@ impl BoardSpace {
             Crew::Bullies => &mut self.bullies,
             Crew::Goons => &mut self.goons,
         }
+    }
+
+    fn get_sorted_crews(self) -> [Crew; 3] {
+        let mut crews = [Crew::Rogues, Crew::Bullies, Crew::Goons];
+        crews.sort_unstable_by_key(|c| self.get_crew(*c));
+        crews.reverse();
+        crews
     }
 
     pub(super) fn winning_sort(
@@ -204,134 +197,136 @@ mod test {
         );
     }
 
-    mod controller {
+    mod controlling_crew {
         use super::*;
 
-        #[test]
-        fn returns_none_if_total_tie() {
-            let space = BoardSpace {
-                rogues: 1,
-                bullies: 1,
-                goons: 1,
-            };
-            assert_eq!(space.controller(BoardSpace::EMPTY, BoardSpace::EMPTY), None);
+        mod when_not_tied {
+            use super::*;
+
+            #[test]
+            fn returns_winning_faction() {
+                let space = BoardSpace {
+                    rogues: 2,
+                    bullies: 1,
+                    goons: 1,
+                };
+                assert_eq!(
+                    space.controlling_crew(BoardSpace::EMPTY, BoardSpace::EMPTY),
+                    Some(Crew::Rogues)
+                );
+            }
         }
 
-        #[test]
-        fn returns_rogues_if_rogues_win() {
-            let space = BoardSpace {
-                rogues: 2,
-                bullies: 1,
-                goons: 1,
-            };
-            assert_eq!(
-                space.controller(BoardSpace::EMPTY, BoardSpace::EMPTY),
-                Some(Crew::Rogues)
-            );
-        }
+        mod when_three_way_tied {
+            use super::*;
 
-        #[test]
-        fn returns_bullies_if_bullies_win() {
-            let space = BoardSpace {
-                rogues: 1,
-                bullies: 2,
-                goons: 1,
-            };
-            assert_eq!(
-                space.controller(BoardSpace::EMPTY, BoardSpace::EMPTY),
-                Some(Crew::Bullies)
-            );
-        }
+            mod when_swords_has_a_winner {
+                use super::*;
 
-        #[test]
-        fn returns_goons_if_goons_win() {
-            let space = BoardSpace {
-                rogues: 1,
-                bullies: 1,
-                goons: 2,
-            };
-            assert_eq!(
-                space.controller(BoardSpace::EMPTY, BoardSpace::EMPTY),
-                Some(Crew::Goons)
-            );
-        }
+                #[test]
+                fn returns_sword_winner() {
+                    let space = BoardSpace {
+                        rogues: 1,
+                        bullies: 1,
+                        goons: 1,
+                    };
+                    let swords = BoardSpace {
+                        rogues: 1,
+                        bullies: 0,
+                        goons: 3,
+                    };
+                    assert_eq!(
+                        space.controlling_crew(swords, BoardSpace::EMPTY),
+                        Some(Crew::Goons)
+                    );
+                }
+            }
 
-        #[test]
-        fn uses_swords_to_break_ties() {
-            let space = BoardSpace {
-                rogues: 2,
-                bullies: 2,
-                goons: 1,
-            };
-            let swords = BoardSpace {
-                rogues: 1,
-                bullies: 0,
-                goons: 3,
-            };
-            assert_eq!(
-                space.controller(swords, BoardSpace::EMPTY),
-                Some(Crew::Rogues)
-            );
-        }
+            mod when_swords_tied {
+                use super::*;
 
-        #[test]
-        fn uses_flags_to_break_sword_ties() {
-            let space = BoardSpace {
-                rogues: 2,
-                bullies: 2,
-                goons: 1,
-            };
-            let swords = BoardSpace {
-                rogues: 1,
-                bullies: 1,
-                goons: 3,
-            };
-            let flags = BoardSpace {
-                rogues: 1,
-                bullies: 0,
-                goons: 3,
-            };
-            assert_eq!(space.controller(swords, flags), Some(Crew::Rogues));
+                mod when_flags_not_ties {
+                    use super::*;
+
+                    #[test]
+                    fn returns_flag_winner() {
+                        let space = BoardSpace {
+                            rogues: 1,
+                            bullies: 1,
+                            goons: 1,
+                        };
+                        let swords = BoardSpace {
+                            rogues: 1,
+                            bullies: 0,
+                            goons: 1,
+                        };
+                        let flags = BoardSpace {
+                            rogues: 1,
+                            bullies: 3,
+                            goons: 1,
+                        };
+                        assert_eq!(space.controlling_crew(swords, flags), Some(Crew::Bullies));
+                    }
+                }
+
+                mod when_flags_tied {
+                    use super::*;
+
+                    #[test]
+                    fn returns_none() {
+                        let space = BoardSpace {
+                            rogues: 1,
+                            bullies: 1,
+                            goons: 1,
+                        };
+                        assert_eq!(space.controlling_crew(BoardSpace::EMPTY, BoardSpace::EMPTY), None);
+                    }
+                }
+            }
         }
     }
 
     mod winning_sort {
         use super::*;
 
-        #[test]
-        fn returns_greater_if_a_has_more_winning_crew() {
-            let a = BoardSpace {
-                rogues: 2,
-                bullies: 1,
-                goons: 1,
-            };
-            let b = BoardSpace {
-                rogues: 1,
-                bullies: 2,
-                goons: 1,
-            };
-            assert_eq!(
-                BoardSpace::winning_sort(a, b, Crew::Rogues, None),
-                Ordering::Greater
-            );
-        }
+        mod when_not_tied {
+            use super::*;
 
-        #[test]
-        fn returns_less_if_b_has_more_winning_crew() {
-            let a = BoardSpace {
-                rogues: 1,
-                bullies: 2,
-                goons: 1,
-            };
-            let b = BoardSpace {
-                rogues: 2,
-                bullies: 1,
-                goons: 1,
-            };
-            assert_eq!(
-                BoardSpace::winning_sort(a, b, Crew::Rogues, None),
-                Ordering::Less
-            );
+            #[test]
+            fn returns_greater_if_a_has_more_winning_crew() {
+                let a = BoardSpace {
+                    rogues: 2,
+                    bullies: 1,
+                    goons: 1,
+                };
+                let b = BoardSpace {
+                    rogues: 1,
+                    bullies: 2,
+                    goons: 1,
+                };
+                assert_eq!(
+                    BoardSpace::winning_sort(a, b, Crew::Rogues, None),
+                    Ordering::Greater
+                );
+            }
+
+            #[test]
+            fn returns_less_if_b_has_more_winning_crew() {
+                let a = BoardSpace {
+                    rogues: 1,
+                    bullies: 2,
+                    goons: 1,
+                };
+                let b = BoardSpace {
+                    rogues: 2,
+                    bullies: 1,
+                    goons: 1,
+                };
+                assert_eq!(
+                    BoardSpace::winning_sort(a, b, Crew::Rogues, None),
+                    Ordering::Less
+                );
+            }
         }
 
         mod when_tied_on_winning_crew {
