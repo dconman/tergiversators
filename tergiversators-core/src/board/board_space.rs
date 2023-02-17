@@ -6,7 +6,7 @@ use crate::{Crew, Error};
 #[derive(Default, Clone, Copy)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(super) struct BoardSpace {
+pub struct BoardSpace {
     rogues: u8,
     bullies: u8,
     goons: u8,
@@ -14,7 +14,7 @@ pub(super) struct BoardSpace {
 
 impl BoardSpace {
     /// Returns the number of crew members of the given type in this space.
-    const fn get_crew(self, crew: Crew) -> u8 {
+    pub const fn get_crew(self, crew: Crew) -> u8 {
         match crew {
             Crew::Rogues => self.rogues,
             Crew::Bullies => self.bullies,

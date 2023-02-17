@@ -45,6 +45,41 @@ pub struct Board {
 }
 
 impl Board {
+
+    pub const fn get_space(&self, zone: Zone) -> &BoardSpace {
+        match zone {
+            Zone::Red => &self.red,
+            Zone::Orange => &self.orange,
+            Zone::Yellow => &self.yellow,
+            Zone::Green => &self.green,
+            Zone::Cyan => &self.cyan,
+            Zone::Blue => &self.blue,
+            Zone::Magenta => &self.magenta,
+            Zone::Purple => &self.purple,
+            Zone::White => &self.white,
+            Zone::Black => &self.black,
+            Zone::Gray => &self.gray,
+        }
+    }
+
+    pub const fn get_swords(&self) -> &BoardSpace {
+        &self.swords
+    }
+
+    pub const fn get_flags(&self) -> &BoardSpace {
+        &self.flags
+    }
+
+    pub const fn get_current_hand(&self) -> &BoardSpace {
+        match self.next_player {
+            Player::Alpha => &self.alpha,
+            Player::Beta => &self.beta,
+            Player::Gamma => &self.gamma,
+            Player::Delta => &self.delta,
+            Player::Epsilon => &self.epsilon,
+        }
+    }
+
     const EMPTY: Self = Self{
         red: BoardSpace::home_base(Crew::Rogues),
         green: BoardSpace::home_base(Crew::Goons),
@@ -96,22 +131,6 @@ impl Board {
             Zone::White => &mut self.white,
             Zone::Black => &mut self.black,
             Zone::Gray => &mut self.gray,
-        }
-    }
-
-    const fn get_space(&self, zone: Zone) -> &BoardSpace {
-        match zone {
-            Zone::Red => &self.red,
-            Zone::Orange => &self.orange,
-            Zone::Yellow => &self.yellow,
-            Zone::Green => &self.green,
-            Zone::Cyan => &self.cyan,
-            Zone::Blue => &self.blue,
-            Zone::Magenta => &self.magenta,
-            Zone::Purple => &self.purple,
-            Zone::White => &self.white,
-            Zone::Black => &self.black,
-            Zone::Gray => &self.gray,
         }
     }
 
@@ -168,16 +187,22 @@ impl Board {
     fn advance_turn(&mut self) {
         self.next_player = match self.next_player {
             Player::Alpha => Player::Beta,
-            Player::Beta => Player::Gamma,
-            Player::Gamma => {
+            Player::Beta => {
                 if self.num_players > 2 {
+                    Player::Gamma
+                } else {
+                    Player::Alpha
+                }
+            },
+            Player::Gamma => {
+                if self.num_players > 3 {
                     Player::Delta
                 } else {
                     Player::Alpha
                 }
             }
             Player::Delta => {
-                if self.num_players > 3 {
+                if self.num_players > 4 {
                     Player::Epsilon
                 } else {
                     Player::Alpha
@@ -280,7 +305,10 @@ impl Board {
         let play_order: Vec<Player> = enum_iterator::all::<Player>()
             .take(num_players)
             .cycle()
-            .skip_while(|&p| p != self.next_player)
+            .skip_while(|&p| {
+                println!("Skipping {p:?}, {:?}", self.next_player);
+                p != self.next_player
+    })
             .take(num_players)
             .collect();
 
